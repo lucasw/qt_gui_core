@@ -33,6 +33,7 @@ import time
 import traceback
 
 from python_qt_binding.QtCore import qCritical, qDebug, QObject, QSettings, Qt, qWarning, Signal, Slot
+from qt_gui_py_common.simple_settings_dialog import SimpleSettingsDialog
 
 from .errors import PluginLoadError
 from .plugin_handler_container import PluginHandlerContainer
@@ -223,9 +224,28 @@ class PluginManager(QObject):
         handler.set_minimized_dock_widgets_toolbar(self._minimized_dock_widgets_toolbar)
 
         if instance_id.plugin_id not in self._plugin_descriptors.keys():
-            qWarning(
-                'PluginManager._load_plugin() could not load plugin "%s": plugin not available' %
-                (instance_id.plugin_id))
+            text = 'PluginManager._load_plugin() could not load plugin '
+            text += '"%s": plugin not available' % (instance_id.plugin_id)
+            qWarning(text)
+            options = [
+                {'title': 'Continue without running the plugin (if the perspective is saved it will not run in future sessions either)',
+                 'description': 'or cancel to exit',
+                 'enabled': True},
+            ]
+            # TODO(lucasw) This dialog isn't fully appropriate but is less
+            # footprint than changing it or making a new dialog
+            dialog = SimpleSettingsDialog(title='Missing Plugin', description=text)
+            dialog.add_exclusive_option_group(title='',
+                                              options=options,
+                                              selected_index=0)
+            handle_missing = dialog.get_settings()[0]
+            # If the user hit the x close button or Cancel get_settings returns None
+            if handle_missing is None:
+                # Nothing to catch this
+                # raise PluginLoadError
+                exit(-1)
+            # TODO(lucasw) the plugin isn't running yet, how to remove it?
+            # self._remove_running_plugin(instance_id)
             return
         plugin_descriptor = self._plugin_descriptors[instance_id.plugin_id]
         handler.set_plugin_descriptor(plugin_descriptor)
